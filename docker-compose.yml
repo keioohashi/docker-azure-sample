@@ -1,0 +1,62 @@
+version: '3.8'
+
+volumes:
+      
+  initdata:
+    driver: azure_file
+    driver_opts:
+      share_name: initdata-share
+      storage_account_name: initdatavolume
+
+networks:
+  default:
+
+services:
+
+  db:
+    image: postgres
+    container_name: db
+    ports:
+      - 5432:5432
+    environment:
+      - POSTGRES_DB=${DB_NAME:-postgres}
+      - POSTGRES_USER=${DB_USER:-postgres}
+      - POSTGRES_PASSWORD=${DB_PASSWORD:-password}
+    volumes:
+      - initdata:/docker-entrypoint-initdb.d
+
+  adminer:
+    image: michalhosna/adminer
+    container_name: adminer
+    ports:
+      - 8080:8080
+    restart: always
+    depends_on:
+      - db
+    environment:
+      - ADMINER_SERVER=db
+      - ADMINER_DRIVER=pgsql
+      - ADMINER_DB=${DB_NAME:-postgres}
+      - ADMINER_USERNAME=${DB_USER:-postgres}
+      - ADMINER_PASSWORD=${DB_PASSWORD:-password}
+      - ADMINER_NAME=ADMINER for PostgreSQL DB
+      
+      
+  account:
+    image: containerregdv.azurecr.io/account
+    container_name: account
+    build:
+      context: ./account
+      dockerfile: Dockerfile
+    ports:
+      - "80:80"
+    depends_on:
+      - db
+    environment:
+      - CONTAINER_NAME=account
+      - PORT=80
+      - DB_USER=${DB_USER:-postgres}
+      - DB_PASSWD=${DB_PASSWORD:-password}
+      - DB_URL=${DB_URL:-r2dbc:postgresql://db:5432/postgres}
+    networks:
+      - default
